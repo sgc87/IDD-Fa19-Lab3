@@ -2,6 +2,12 @@
 
 *A lab report by John Q. Student.*
 
+## Prelab
+
+I've thought of using a photoresistor to actuate a window open or closed depending on the brightness outside. 
+
+![Window Photo Actuator](https://github.com/sgc87/IDD-Fa19-Lab3/blob/master/prelab.jpg)
+
 ## In The Report
 
 Include your responses to the bold questions on your own fork of [this lab report template](https://github.com/FAR-Lab/IDD-Fa18-Lab2). Include snippets of code that explain what you did. Deliverables are due next Tuesday. Post your lab reports as README.md pages on your GitHub, and post a link to that on your main class hub page.
@@ -249,20 +255,147 @@ void loop() {
 
 **a. Does it matter what actions are assigned to which state? Why?**
 
+Yes, it matters, because doing something out of order can cause a system to not work at all. For example, you wouldn't want to output data before getting any inputs. 
+
 **b. Why is the code here all in the setup() functions and not in the loop() functions?**
+
+This is because, we don't want the different states to run non-stop simutaneously. That would not be a state function. Instead you want the functions to be called only when you are in the specific state that runs that function. 
 
 **c. How many byte-sized data samples can you store on the Atmega328?**
 
+Atmega allows you to store 1024 bit sized data. 
+
 **d. How would you get analog data from the Arduino analog pins to be byte-sized? How about analog data from the I2C devices?**
+
+Arduino analog pins have 10 bits of data, so it can take on 8 bits of data without any modification. 
+
+I2C sends packets in 8-bits, so no adjustment needed here as well. 
 
 **e. Alternately, how would we store the data if it were bigger than a byte? (hint: take a look at the [EEPROMPut](https://www.arduino.cc/en/Reference/EEPROMPut) example)**
 
+If the data is bigger than a byte, it would be send in sequential packets to send the information over and then concatentated in memory. 
+
 **Upload your modified code that takes in analog values from your sensors and prints them back out to the Arduino Serial Monitor.**
+
+Here's my state machien code. 
+```
+#include <EEPROM.h>
+#include <SPI.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 32 // OLED display height, in pixels
+
+// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
+#define OLED_RESET     4 // Reset pin # (or -1 if sharing Arduino reset pin)
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+int analog_in = A0;
+int sensor = 0;
+
+int pushbutton = 0;
+int weightsensor;
+int button;
+
+byte eepromAddr;
+int add = 0;
+int addr_len = 0;
+
+int state = 1;
+int push;
+
+int time_count = 0;
+
+int ee_num;
+
+void setup() {
+  Serial.begin(9600);
+
+  // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3C for 128x32
+    Serial.println(F("SSD1306 allocation failed"));
+    for(;;); // Don't proceed, loop forever
+  }
+  pinMode(analog_in, INPUT);
+  pinMode(pushbutton, INPUT);
+  while (!Serial) {
+    ;
+  }
+}
+
+void loop() {
+  display.setTextSize(2);
+  display.setTextColor(WHITE);
+  display.clearDisplay();
+  weightsensor = analogRead(pushbutton);
+  button = digitalRead(pushbutton);
+  if (state == 1) {
+    if (weightsensor > 200) {
+      state = 2;
+    }
+    display.clearDisplay();
+    display.setCursor(0,0);
+    display.print(F("Park and  pay later"));
+    display.display();
+    delay(100);
+  }
+  if (state == 2) {
+    if (weightsensor > 200) {
+      EEPROM.write(add, time_count);
+      add++;
+      if (add == EEPROM.length()) {
+        add = 0;
+      }
+      display.clearDisplay();
+      display.setCursor(0,0);
+      display.print(F("Time:"));
+      display.setCursor(0, 18);
+      display.print(time_count);
+      display.display();
+      delay(1000);
+      time_count++;
+    }
+    if (weightsensor < 200) {
+      state = 3;
+    }
+  }
+  if (state == 3) {
+    display.clearDisplay();
+    display.setCursor(0,0);
+    display.print(F("Amount Due$"));
+
+    display.print((time_count - 1));
+    display.display();
+    delay(100);
+    if (button == 0) {
+      state = 1;
+      time_count = 0;
+    }
+    eepromAddr = EEPROM.read(addr_len);
+    Serial.print(addr_len);
+    Serial.print("\t");
+    Serial.print(eepromAddr, DEC);
+    addr_len++;
+    if (addr_len == EEPROM.length()) {
+      addr_len = 0;
+      delay(500);
+    }
+  }
+  display.clearDisplay();
+}
+  
+```
 
 ### 2. Design your logger
  
 **a. Insert here a copy of your final state diagram.**
 
+![State Diagram](https://github.com/sgc87/IDD-Fa19-Lab3/blob/master/im2.PNG)
+
 ### 3. Create your data logger!
  
 **a. Record and upload a short demo video of your logger in action.**
+
+[Video of State Machine!](https://www.youtube.com/watch?v=DX7BOJ-83vs&feature=share&fbclid=IwAR02bAwMiAQa9ZHPidH8ulxZSJCGgI-Jlu8B2DkU4JyJ1rqLTDrVbA-T9bc)
