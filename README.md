@@ -83,14 +83,165 @@ The relationship is deacreasingly logrithmic as shown by the following graph.
 ![Photorisistor Graph](https://github.com/sgc87/IDD-Fa19-Lab3/blob/master/sensor_photoresistor_vt935g_slope.png)
 The resistivity goes down as more light is received. 
 
+Softpot: 
+This also has a logrithmic relationship. 
+
 ### 2. Accelerometer
  
 **a. Include your accelerometer read-out code in your write-up.**
 
+Here is the beginning of the output
+```
+LIS3DH found!
+Range = 4G
+X:  432  	Y:  1680  	Z:  12000		X: 0.63 	Y: 1.69 	Z: 11.95 m/s^2 
+
+X:  352  	Y:  1072  	Z:  7936		X: 0.50 	Y: 1.32 	Z: 9.66 m/s^2 
+
+X:  432  	Y:  1040  	Z:  7936		X: 0.50 	Y: 1.32 	Z: 9.62 m/s^2 
+
+X:  416  	Y:  1056  	Z:  7904		X: 0.54 	Y: 1.34 	Z: 9.46 m/s^2 
+
+X:  384  	Y:  1088  	Z:  7920		X: 0.44 	Y: 1.30 	Z: 9.48 m/s^2 
+
+X:  448  	Y:  1056  	Z:  7824		X: 0.46 	Y: 1.26 	Z: 9.46 m/s^2 
+
+X:  416  	Y:  1072  	Z:  7856		X: 0.44 	Y: 1.30 	Z: 9.41 m/s^2 
+```
+
+[Video of Accelerometer Working](https://youtu.be/xF9uoT72Bts)
+
+This is my code
+
+```
+// include the library code:
+#include <LiquidCrystal.h>
+
+#include <Wire.h>
+#include <SPI.h>
+#include <Adafruit_LIS3DH.h>
+#include <Adafruit_Sensor.h>
+
+// Used for software SPI
+#define LIS3DH_CLK 13
+#define LIS3DH_MISO 12
+#define LIS3DH_MOSI 11
+// Used for hardware & software SPI
+#define LIS3DH_CS 10
+
+// software SPI
+//Adafruit_LIS3DH lis = Adafruit_LIS3DH(LIS3DH_CS, LIS3DH_MOSI, LIS3DH_MISO, LIS3DH_CLK);
+// hardware SPI
+//Adafruit_LIS3DH lis = Adafruit_LIS3DH(LIS3DH_CS);
+// I2C
+Adafruit_LIS3DH lis = Adafruit_LIS3DH();
+
+// initialize the library by associating any needed LCD interface pin
+// with the arduino pin number it is connected to
+const int rs = 12, en = 11, d4 = 5, d5 = 4, d6 = 3, d7 = 2;
+LiquidCrystal lcd(rs, en, d4, d5, d6, d7);
+
+void setup(void) {
+#ifndef ESP8266
+  while (!Serial);     // will pause Zero, Leonardo, etc until serial console opens
+#endif
+
+  Serial.begin(9600);
+  Serial.println("LIS3DH test!");
+  lcd.begin(16, 2);
+  
+  if (! lis.begin(0x18)) {   // change this to 0x19 for alternative i2c address
+    Serial.println("Couldnt start");
+    while (1);
+  }
+  Serial.println("LIS3DH found!");
+  
+  lis.setRange(LIS3DH_RANGE_4_G);   // 2, 4, 8 or 16 G!
+  
+  Serial.print("Range = "); Serial.print(2 << lis.getRange());  
+  Serial.println("G");
+}
+
+void loop() {
+  lis.read();      // get X Y and Z data at once
+  // Then print out the raw data
+  Serial.print("X:  "); Serial.print(lis.x); 
+  Serial.print("  \tY:  "); Serial.print(lis.y); 
+  Serial.print("  \tZ:  "); Serial.print(lis.z); 
+
+  /* Or....get a new sensor event, normalized */ 
+  sensors_event_t event; 
+  lis.getEvent(&event);
+  
+  /* Display the results (acceleration is measured in m/s^2) */
+  Serial.print("\t\tX: "); Serial.print(event.acceleration.x);
+  Serial.print(" \tY: "); Serial.print(event.acceleration.y); 
+  Serial.print(" \tZ: "); Serial.print(event.acceleration.z); 
+  Serial.println(" m/s^2 ");
+
+  lcd.setCursor(0, 0);
+  lcd.print("x=" + String(event.acceleration.x));
+  lcd.setCursor(9, 0);
+  lcd.print("y=" + String(event.acceleration.y));
+  lcd.setCursor(0, 2);
+  lcd.print("z=" + String(event.acceleration.z));
+  lcd.setCursor(7, 2);
+  lcd.print("m/ss");
+
+  Serial.println();
+ 
+  delay(200); 
+}
+```
 
 ## Part D. Graphic Display
 
 **Take a picture of your screen working insert it here!**
+
+[Link to working video](https://youtu.be/SGC4oZQQtdM)
+
+![OLED](https://github.com/sgc87/IDD-Fa19-Lab3/blob/master/oled.jpg)
+
+Here is the code for it
+```
+#include <SPI.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define SCREEN_WIDTH 128 // OLED display width, in pixels
+#define SCREEN_HEIGHT 32 // OLED display height, in pixels
+
+// Declaration for an SSD1306 display connected to I2C (SDA, SCL pins)
+#define OLED_RESET     4 // Reset pin # (or -1 if sharing Arduino reset pin)
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+int analog_in = A0;
+int oled = 0;
+
+void setup() {
+  Serial.begin(9600);
+
+  // SSD1306_SWITCHCAPVCC = generate display voltage from 3.3V internally
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { // Address 0x3C for 128x32
+    Serial.println(F("SSD1306 allocation failed"));
+    for(;;); // Don't proceed, loop forever
+  }
+}
+
+void loop() {
+  oled = analogRead(analog_in);
+  display.setTextSize(2);
+  display.setTextColor(WHITE);
+  display.setCursor(0,0);
+  display.print(F("Force Ind:"));
+  display.setCursor(0, 18);
+  display.print(oled);
+  display.display();
+  delay(100);
+  display.clearDisplay();
+}
+```
 
 ## Part D. Logging values to the EEPROM and reading them back
  
